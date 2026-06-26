@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+
+  # ───────────────────────── MQTT ─────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── Publisher ─────────────────────────
+  publisher:
+    build:
+      context: ./publisher
+    container_name: publisher
+    depends_on:
+      - mosquitto
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── Node-RED ─────────────────────────
+  nodered:
+    image: nodered/node-red:3.1
+    container_name: nodered
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./nodered:/data
+    depends_on:
+      - mosquitto
+      - orion
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── MongoDB ─────────────────────────
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── Orion ─────────────────────────
+  orion:
+    image: fiware/orion:3.10.1
+    container_name: orion
+    depends_on:
+      - mongo
+    ports:
+      - "1026:1026"
+    command: -dbhost mongo
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── CrateDB ─────────────────────────
+  crate:
+    image: crate:5.5.0
+    container_name: crate
+    ports:
+      - "4200:4200"
+      - "5432:5432"
+    command: >
+      crate
+      -Cnetwork.host=0.0.0.0
+      -Chttp.cors.enabled=true
+      -Chttp.cors.allow-origin="*"
+      -Cdiscovery.type=single-node
+    environment:
+      - CRATE_HEAP_SIZE=1g
+    volumes:
+      - crate-data:/data
+    networks:
+      - fiware-net
+    restart: unless-stopped
+    healthcheck:
+        test: ["CMD-SHELL", "curl -f http://localhost:4200/ || exit 1"]
+        interval: 10s
+        timeout: 5s
+        retries: 20
+        start_period: 40s
+
+  # ───────────────────────── QuantumLeap ─────────────────────────
+  quantumleap:
+    image: orchestracities/quantumleap:0.8.3
+    container_name: quantumleap
+    ports:
+      - "8668:8668"
+    depends_on:
+      crate:
+        condition: service_healthy
+    environment:
+      - CRATE_HOST=crate
+      - CRATE_PORT=4200
+      - LOGLEVEL=DEBUG
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+  # ───────────────────────── Grafana ─────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - crate
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - fiware-net
+    restart: unless-stopped
+
+# ───────────────────────── NETWORK ─────────────────────────
+networks:
+  fiware-net:
+    driver: bridge
+
+# ───────────────────────── VOLUMES ─────────────────────────
+volumes:
+  mongo-data:
+  crate-data:
+  grafana-data:

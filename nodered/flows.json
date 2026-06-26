@@ -1,0 +1,140 @@
+[
+    {
+        "id": "350b25b9826676bb",
+        "type": "tab",
+        "label": "Conveyor Digital Twin FIX",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "mqtt_broker_1",
+        "type": "mqtt-broker",
+        "name": "Mosquitto",
+        "broker": "mosquitto",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true
+    },
+    {
+        "id": "e8a976f95bb102c1",
+        "type": "mqtt in",
+        "z": "350b25b9826676bb",
+        "name": "MQTT Conveyor",
+        "topic": "conveyor/data",
+        "qos": "0",
+        "datatype": "auto",
+        "broker": "mqtt_broker_1",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 160,
+        "y": 120,
+        "wires": [
+            [
+                "1cf8b03dfdee8a03"
+            ]
+        ]
+    },
+    {
+        "id": "1cf8b03dfdee8a03",
+        "type": "json",
+        "z": "350b25b9826676bb",
+        "name": "Parse JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 340,
+        "y": 120,
+        "wires": [
+            [
+                "f7d7fe580f28dc0d"
+            ]
+        ]
+    },
+    {
+        "id": "f7d7fe580f28dc0d",
+        "type": "function",
+        "z": "350b25b9826676bb",
+        "name": "NGSI + Logic",
+        "func": "let d = msg.payload;\n\nlet status = \"NORMAL\";\n\nif (d.vibration > 12 || d.motorCurrent > 150) {\n    status = \"CRITICAL\";\n} else if (d.load > 90 && d.motorCurrent > 130) {\n    status = \"OVERLOAD\";\n} else if (d.vibration > 8) {\n    status = \"WEAR\";\n}\nlet score = 0;\n\nscore += d.vibration * 0.3;\nscore += d.motorCurrent * 0.2;\nscore += (100 - d.load) * 0.1;\n\nlet anomaly = \"NORMAL\";\n\nif (score > 25) anomaly = \"WARNING\";\nif (score > 40) anomaly = \"CRITICAL\";\n\nmsg.payload.anomalyScore = {\n  type: \"Number\",\n  value: score\n};\n\nmsg.payload.anomaly = {\n  type: \"Text\",\n  value: anomaly\n};\n\nlet loss = Math.max(0, (100 - d.load) * 150);\n\nmsg.payload = {\n    beltSpeed: { value: d.beltSpeed },\n    motorCurrent: { value: d.motorCurrent },\n    vibration: { value: d.vibration },\n    load: { value: d.load },\n    status: { value: status },\n    lossPerHour: { value: loss }\n};\n\n\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 260,
+        "wires": [
+            [
+                "2dc9628cd6425c3a",
+                "bc71cc874ad37a2e"
+            ]
+        ]
+    },
+    {
+        "id": "2dc9628cd6425c3a",
+        "type": "debug",
+        "z": "350b25b9826676bb",
+        "name": "Payload OUT",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 640,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "bc71cc874ad37a2e",
+        "type": "http request",
+        "z": "350b25b9826676bb",
+        "name": "Orion PATCH Update",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "http://orion:1026/v2/entities/Conveyor:001/attrs",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [
+            {
+                "keyType": "Content-Type",
+                "keyValue": "",
+                "valueType": "application/json",
+                "valueValue": ""
+            }
+        ],
+        "x": 380,
+        "y": 420,
+        "wires": [
+            [
+                "b508812b73fea60c"
+            ]
+        ]
+    },
+    {
+        "id": "b508812b73fea60c",
+        "type": "debug",
+        "z": "350b25b9826676bb",
+        "name": "Orion Response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 600,
+        "y": 360,
+        "wires": []
+    }
+]

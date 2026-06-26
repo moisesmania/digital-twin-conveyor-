@@ -1,0 +1,36 @@
+{
+  "description": "Conveyor subscription to QuantumLeap",
+  "subject": {
+    "entities": [
+      {
+        "id": "Conveyor:001",
+        "type": "Conveyor"
+      }
+    ],
+    "condition": {
+      "attrs": [
+        "beltSpeed",
+        "motorCurrent",
+        "vibration",
+        "load",
+        "status",
+        "lossPerHour"
+      ]
+    }
+  },
+  "notification": {
+    "http": {
+      "url": "http://quantumleap:8668/v2/notify"
+    },
+    "attrs": [
+      "beltSpeed",
+      "motorCurrent",
+      "vibration",
+      "load",
+      "status",
+      "lossPerHour",
+      "timestamp"
+    ]
+  },
+  "throttling": 1
+}
